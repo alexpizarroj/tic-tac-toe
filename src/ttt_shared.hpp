@@ -114,16 +114,17 @@ class ttt_update_message {
     
     // Try to recover update message
     try {
-      const unsigned object_length = msg.body_length() - msg_preamble().size();
-
-      char buffer[object_length + 1];
+      char buffer[ttt_message::max_body_length + 1];
+      unsigned object_length = msg.body_length() - msg_preamble().size();
+      
       strncpy(buffer, msg.body() + msg_preamble().size(), object_length);
       buffer[object_length] = 0;
 
       std::stringstream ss(buffer);
-      boost::archive::text_iarchive ia(ss);
-
-      ia >> umsg;
+      {
+        boost::archive::text_iarchive ia(ss);
+        ia >> umsg;
+      }
     } catch (boost::archive::archive_exception& e) {
       return false;
     }

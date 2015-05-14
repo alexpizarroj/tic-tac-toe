@@ -7,6 +7,7 @@
 #include <utility>
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
+#include <boost/algorithm/string.hpp>
 #include "ttt_shared.hpp"
 
 using boost::asio::ip::tcp;
@@ -158,7 +159,7 @@ class ttt_client : public ttt_client_base {
 
  protected:
   void on_server_connection() override {
-    std::cout << "WAITING FOR THE GAME TO START...\n";
+    std::cout << "Waiting for the game to start...\n";
 
     last_umsg_.playing = true;
 
@@ -166,10 +167,10 @@ class ttt_client : public ttt_client_base {
       while (this->last_umsg_.playing) {  // While the game is running...
         std::string token;
         std::cin >> token;
-        
+
         int value;
         bool got_int = (std::sscanf(token.c_str(), "%d", &value) == 1);
-        
+
         if (got_int && 1 <= value && value <= 9) {
           int x = this->numpad_to_cell[value].first;
           int y = this->numpad_to_cell[value].second;
@@ -188,12 +189,20 @@ class ttt_client : public ttt_client_base {
       return;
     }
 
+    std::cout << '\n';
     draw_game(umsg);
 
     last_umsg_ = umsg;
   }
 
-  void on_server_disconnection() override { last_umsg_.playing = false; }
+  void on_server_disconnection() override {
+    last_umsg_.playing = false;
+
+    std::cout << "Client session finished.\n";
+  }
+
+ protected:
+  void log(const std::string& msg) const {}
 
  private:
   /*
@@ -206,44 +215,79 @@ class ttt_client : public ttt_client_base {
       player_name[i] = (i == (int)umsg.player_id ? "you" : "your opponent");
     }
 
-    // Game header
-    const std::string header = "Player 1 (Xs, " + player_name[0] +
-                               ") vs Player 2 (Os, " + player_name[1] + ")";
-
-    const std::string header_line(header.size(), '*');
-
-    std::cout << '\n';
-    std::cout << header_line << '\n' << header << '\n' << header_line << "\n\n";
+    // Game title
+    // std::cout << enclose_text("TIC TAC TOE") << '\n';
 
     // Game board
-    const std::string board = board_from(umsg);
+    const std::string board = draw_board_str(umsg);
 
-    std::cout << board << '\n';
-
-    // Instructions
-    if (umsg.current_player == umsg.player_id) {
-      std::cout
-          << "Type a digit from your numeric pad (numpad) to choose a cell.\n";
-      std::cout << "Digits correspond to cells so that the game board "
-                   "resembles the numpad.\n\n";
-    }
-    // Game's next step
+    // How to play
+    std::string instructions = "";
     if (umsg.playing) {
-      std::cout << "Waiting for " << player_name[(int)umsg.current_player]
-                << " to move";
-    } else if (umsg.winner == ttt_player_id::none) {
-      std::cout << "GAME OVER, you tied!";
-    } else {
-      std::cout << "GAME OVER, you "
-                << (umsg.winner == umsg.player_id ? "won!" : "lost!");
+      instructions +=
+          "HOW TO PLAY\n"
+          "Type a digit from your numeric pad (numpad) to choose a cell.\n"
+          "Digits correspond to cells so that the game board resembles your "
+          "numpad.\n";
     }
-    std::cout << "\n\n";
+
+    // Game status information
+    std::string status = "";
+    if (umsg.playing) {
+      status +=
+          "Waiting for " + player_name[(int)umsg.current_player] + " to move";
+    } else if (umsg.winner == ttt_player_id::none) {
+      status += "GAME OVER, you tied!";
+    } else {
+      status += "GAME OVER, you ";
+      status += (umsg.winner == umsg.player_id ? "won!" : "lost!");
+    }
+    status += "\n";
+
+    // Draw it!
+    std::cout << board << '\n';
+    std::cout << instructions << '\n';
+    std::cout << status << '\n';
+  }
+
+  /*
+  ** 'Encloses' a given text around a box,
+  ** whose edges are drawn with a given char
+  */
+  std::string enclose_text(const std::string str, char fill_char = '*') {
+    std::deque<std::string> content;
+    boost::split(content, str, boost::is_any_of("\n"));
+
+    unsigned max_len = 0;
+    for (auto line : content) {
+      max_len = std::max((unsigned)line.size(), max_len);
+    }
+
+    std::string separator(max_len + 4, fill_char);
+
+    if (content.front() != "") {
+      content.push_front("");
+    }
+    if (content.back() != "") {
+      content.push_back("");
+    }
+
+    std::stringstream result;
+
+    result << separator << '\n';
+    for (std::string line : content) {
+      line = line + std::string(max_len - line.size(), ' ');
+      result << fill_char << ' ' << line << ' ' << fill_char << '\n';
+    }
+    result << separator << '\n';
+
+    return result.str();
   }
 
   /*
   ** Returns a text representation of the board inside a TTT Update Message
   */
-  std::string board_from(const ttt_update_message& umsg) {
+  std::string draw_board_str(const ttt_update_message& umsg) {
     std::string board = empty_board;
 
     for (unsigned i = 0; i < ttt_board_side; i++) {
@@ -254,8 +298,7 @@ class ttt_client : public ttt_client_base {
         }
 
         // Get player's corresponding letter
-        std::string letter =
-            (umsg.board[i][j] == ttt_player_id::player_1 ? X : O);
+        std::string letter = (umsg.board[i][j] == umsg.player_id ? X : O);
 
         // Draw it!
         const int x = 8 * i, y = 8 * j;
@@ -277,9 +320,9 @@ class ttt_client : public ttt_client_base {
  private:
   ttt_update_message last_umsg_;
   const std::string X =
-      "       \n o   o \n  o o  \n   o   \n  o o  \n o   o \n       \n";
+      "       \n \\   / \n  \\ /  \n   x   \n  / \\  \n /   \\ \n       \n";
   const std::string O =
-      "       \n  ooo  \n o   o \n o   o \n o   o \n  ooo  \n       \n";
+      "   _   \n  / \\  \n |   | \n |   | \n |   | \n  \\_/  \n       \n";
   const std::string empty_board =
       "       |       |       \n       |       |       \n       |       |    "
       "   \n       |       |       \n       |       |       \n       |       "

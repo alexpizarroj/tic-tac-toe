@@ -486,6 +486,7 @@ int main(int argc, char* argv[]) {
 
     std::list<ttt_server> servers;
     for (int i = 1; i < argc; ++i) {
+      // El servidor se exhibe
       tcp::endpoint endpoint(tcp::v4(), std::atoi(argv[i]));
       servers.emplace_back(io_service, endpoint);
     }
