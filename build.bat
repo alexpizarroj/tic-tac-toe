@@ -1,0 +1,1 @@
+cl /EHsc /I C:\local\boost_1_58_0\ "src\ttt_server.cpp" /link /LIBPATH:"C:\local\boost_1_58_0\lib"

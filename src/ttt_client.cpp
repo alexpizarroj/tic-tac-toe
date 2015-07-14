@@ -5,6 +5,7 @@
 #include <string>
 #include <sstream>
 #include <utility>
+#include <vector>
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 #include <boost/algorithm/string.hpp>
@@ -172,9 +173,8 @@ class ttt_client : public ttt_client_base {
         bool got_int = (std::sscanf(token.c_str(), "%d", &value) == 1);
 
         if (got_int && 1 <= value && value <= 9) {
-          int x = this->numpad_to_cell[value].first;
-          int y = this->numpad_to_cell[value].second;
-          this->take(x, y);
+          auto mapped_res = this->numpad_to_cell(value);
+          this->take(mapped_res.first, mapped_res.second);
         }
       }
     });
@@ -316,6 +316,16 @@ class ttt_client : public ttt_client_base {
 
     return board;
   }
+  
+  std::pair<int, int> numpad_to_cell(int i) {
+    static const std::vector<std::pair<int, int>> data {
+      {9, 9},
+      {2, 0}, {2, 1}, {2, 2},
+      {1, 0}, {1, 1}, {1, 2},
+      {0, 0}, {0, 1}, {0, 2}
+    };
+    return data[i];
+  }
 
  private:
   ttt_update_message last_umsg_;
@@ -333,16 +343,6 @@ class ttt_client : public ttt_client_base {
       "     \n       |       |       \n       |       |       \n       |     "
       "  |       \n       |       |       \n       |       |       \n       "
       "|       |       \n";
-  const std::pair<int, int> numpad_to_cell[10] = {{9, 9},
-                                                  {2, 0},
-                                                  {2, 1},
-                                                  {2, 2},
-                                                  {1, 0},
-                                                  {1, 1},
-                                                  {1, 2},
-                                                  {0, 0},
-                                                  {0, 1},
-                                                  {0, 2}};
 };
 
 //------------------------------------------------------------------------------
